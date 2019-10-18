@@ -1,0 +1,108 @@
+library(boot) 
+library(car)
+library(QuantPsyc)
+library(lmtest)
+library(sandwich)
+library(vars)
+library(nortest)
+library(MASS)
+
+setwd("C:\\Users\\ADMIN\\Desktop\\R Models\\Project")
+
+data<- read.csv("Data.csv")
+str(data)
+summary(data)
+data$Number.of.Open.Complaints <- as.factor(data$Number.of.Open.Complaints)
+data$Number.of.Policies <- as.factor(data$Number.of.Policies) 
+
+
+boxplot(data$Customer.Lifetime.Value)
+quantile(data$Customer.Lifetime.Value, c(0,0.05,0.1,0.25,0.5,0.75,0.90,0.95,0.99,0.995,1))
+
+data2 <- data[data$Customer.Lifetime.Value <15433.385 & data$Customer.Lifetime.Value >= 2226.682, ]
+boxplot(data2$Customer.Lifetime.Value)
+
+quantile(data2$Customer.Lifetime.Value, c(0,0.01,0.02,0.1,0.25,0.5,0.75,0.90,0.95,0.97,0.98,0.985,0.99,0.995,1))
+
+
+nrow(data)-nrow(data2)
+
+
+data <- data2
+
+
+## Check the missing value (if any)
+sapply(data, function(x) sum(is.na(x)))
+
+data <- na.omit(data)
+
+nrow(data)
+names(data)
+
+##Spliting the data into train and test
+ind <- sample(2, nrow(data), replace = TRUE, prob = c(0.7, 0.3))
+train <- data[ind == 1,]
+test <- data[ind == 2,]
+
+fit<- lm(Customer.Lifetime.Value ~ State + Response + Coverage + Education + Effective.To.Date + EmploymentStatus + Gender + Income + Location.Code + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + Months.Since.Policy.Inception + Number.of.Open.Complaints + Number.of.Policies + Policy.Type + Policy + Renew.Offer.Type + Sales.Channel + Total.Claim.Amount + Vehicle.Class + Vehicle.Size, data=train)
+summary(fit)
+
+fit<- lm(Customer.Lifetime.Value ~ Response + Coverage + Education + Effective.To.Date + EmploymentStatus + Gender + Income + Location.Code + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + Months.Since.Policy.Inception + Number.of.Open.Complaints + Number.of.Policies + Policy.Type + Policy + Renew.Offer.Type + Sales.Channel + Total.Claim.Amount + Vehicle.Class + Vehicle.Size, data=train)
+summary(fit)
+
+fit<- lm(Customer.Lifetime.Value ~ Coverage + Education + EmploymentStatus + Gender + Income + Location.Code + Marital.Status + Monthly.Premium.Auto + Months.Since.Last.Claim + Months.Since.Policy.Inception + Number.of.Open.Complaints + Number.of.Policies + Policy.Type + Policy + Renew.Offer.Type + Sales.Channel + Total.Claim.Amount + Vehicle.Class + Vehicle.Size, data=train)
+summary(fit)
+
+fit<- lm(Customer.Lifetime.Value ~ Coverage + I(Education == "Doctor") + I(Education == "High School or Below") + I(Education == "Master") + I(EmploymentStatus == "Employed") + I(EmploymentStatus == "Retired") + I(EmploymentStatus == "Unemployed") + Gender + Income + Marital.Status + Monthly.Premium.Auto + I(Number.of.Open.Complaints == "2") + I(Number.of.Open.Complaints == "3") + I(Number.of.Open.Complaints == "4") + I(Number.of.Open.Complaints == "5") +Number.of.Policies + Sales.Channel + Total.Claim.Amount + I(Vehicle.Class == "Luxury Car") + I(Vehicle.Class == "Sports Car") + I(Vehicle.Class == "SUV"), data=train)
+summary(fit)
+
+
+##Final model 
+fit<- lm(Customer.Lifetime.Value ~ Coverage + I(Education == "Doctor") + I(Education == "High School or Below") + I(Education == "Master") + I(EmploymentStatus == "Employed") + I(EmploymentStatus == "Retired") + I(EmploymentStatus == "Unemployed") + Gender + Income + Marital.Status + Monthly.Premium.Auto + I(Number.of.Open.Complaints == "2") + I(Number.of.Open.Complaints == "3") + I(Number.of.Open.Complaints == "4") + I(Number.of.Open.Complaints == "5") +Number.of.Policies + Sales.Channel + Total.Claim.Amount + I(Vehicle.Class == "Luxury Car") + I(Vehicle.Class == "Sports Car") + I(Vehicle.Class == "SUV"), data=train)
+summary(fit)
+
+
+#Check Vif, vif>2 means presence of multicollinearity
+vif(fit)
+
+
+
+## Get the predicted or fitted values
+fitted(fit)
+
+## MAPE
+
+
+test$pred <- predict(fit, test)
+
+#Calculating MAPE
+attach(test)
+(sum((abs(Customer.Lifetime.Value-pred))/Customer.Lifetime.Value))/nrow(test)
+
+
+##################################### Checking of Assumption ############################################
+
+# residuals should be uncorrelated ##Autocorrelation
+# Null H0: residuals from a linear regression are uncorrelated. Value should be close to 2. 
+#Less than 1 and greater than 3 -> concern
+## Should get a high p value
+
+dwt(fit)
+
+# Checking multicollinearity
+vif(fit) # should be within 2. If it is greater than 10 then serious problem
+
+################ Constant error variance ##########Heteroscedasticity
+
+
+# Breusch-Pagan test
+bptest(fit)  # Null hypothesis -> error is homogenious (p value should be more than 0.05)
+
+
+
+## Normality testing Null hypothesis is data is normal.
+
+resids <- fit$residuals
+
+
+ad.test(resids) #get Anderson-Darling test for normality 
